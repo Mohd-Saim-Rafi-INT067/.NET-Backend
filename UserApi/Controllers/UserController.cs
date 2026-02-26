@@ -8,21 +8,22 @@ namespace UserApi.Controllers;
 [ApiController]
 public class UserController: ControllerBase
 {
-    private readonly IUserService _service;
+    private readonly IUserService _UserService;
     public UserController(IUserService service)
     {
-        _service = service;
+        _UserService = service;
     }
     [HttpGet]
     public IActionResult GetAllUsers()
     {
-        return Ok(_service.GetAllUsers());
+        var users = _UserService.GetAllUsers();
+        return Ok(users);
     }
 
     [HttpGet("{id}")]
     public IActionResult GetById(int id)
     {
-        var user = _service.GetById(id);
+        var user = _UserService.GetById(id);
         if (user == null)
         {
             return NotFound();
@@ -31,16 +32,16 @@ public class UserController: ControllerBase
     }
 
     [HttpPost]
-    public IActionResult Create(User user)
+    public IActionResult CreateUser(User user)
     {
-        _service.Create(user);
+        _UserService.CreateUser(user);
         return CreatedAtAction(nameof(GetById), new {id = user.Id}, user);
     }
 
     [HttpPut("{id}")]
-    public IActionResult Update(int id, User user)
+    public IActionResult UpdateUser(int id, User user)
     {
-        var success = _service.Update(id, user);
+        var success = _UserService.UpdateUser(id, user);
         if (!success)
         {
             return NotFound();
@@ -49,9 +50,9 @@ public class UserController: ControllerBase
     }
 
     [HttpDelete("{id}")]
-    public IActionResult Delete(int id)
+    public IActionResult DeleteUser(int id)
     {
-        var success = _service.Delete(id);
+        var success = _UserService.DeleteUser(id);
         if (!success)
         {
             return NotFound();

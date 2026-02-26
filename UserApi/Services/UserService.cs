@@ -16,13 +16,13 @@ public class UserService : IUserService
         return _users.ContainsKey(id) ? _users[id] : null;
     }
 
-    public void Create(User user)
+    public void CreateUser(User user)
     {
         user.Id = _nextId++;
         _users[user.Id] = user;
     }
 
-    public bool Update(int id, User user)
+    public bool UpdateUser(int id, User user)
     {
         if (!_users.ContainsKey(id))
         {
@@ -33,7 +33,7 @@ public class UserService : IUserService
         return true;
     }
 
-    public bool Delete(int id)
+    public bool DeleteUser(int id)
     {
         return _users.Remove(id);
     }
