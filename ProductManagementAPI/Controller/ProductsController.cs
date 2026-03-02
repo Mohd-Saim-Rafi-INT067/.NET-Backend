@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using ProductManagementAPI.Data;
 using ProductManagementAPI.Models;
 using Microsoft.EntityFrameworkCore;
+using ProductManagementAPI.Responses;
 
 namespace ProductManagementAPI.Controllers
 {
@@ -19,7 +20,7 @@ namespace ProductManagementAPI.Controllers
         public async Task<ActionResult<List<Product>>> GetAllProducts()
         {
             var products = await _context.Products.ToListAsync();
-            return Ok(products);
+            return Ok(new ApiResponse<List<Product>>(200, true, "Products fetched Successfully", products));
         }
 
         [HttpGet("{id}")]
@@ -28,9 +29,9 @@ namespace ProductManagementAPI.Controllers
             var product = await _context.Products.FindAsync(id);
             if (product == null)
             {
-                return NotFound(new {Message = $"Product with id {id} not found"});
+                return NotFound(new ApiResponse<Object>(404, false, $"Product with id {id} not found"));
             }
-            return Ok(product);
+            return Ok(new ApiResponse<Product>(200, true, "Product fetched successfully", product));
         }
 
         [HttpPost]
@@ -38,11 +39,11 @@ namespace ProductManagementAPI.Controllers
         {
             if (product == null)
             {
-                return BadRequest(new {Message="Invalid Product data"});
+                return BadRequest(new ApiResponse<Object>(400, false, "Invalid product data"));
             }
             _context.Products.Add(product);
             await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetProductById), new {id = product.Id}, product);
+            return CreatedAtAction(nameof(GetProductById), new {id = product.Id}, new ApiResponse<Product>(201, true, "Product created Successfully", product));
         }
 
         [HttpPut("{id}")]
@@ -50,12 +51,12 @@ namespace ProductManagementAPI.Controllers
         {
             if (id != updatedProduct.Id)
             {
-                return BadRequest(new {Message="Product ID mismatch"});
+                return BadRequest(new ApiResponse<Object>(400, false, "Product Id mismatch"));
             }
             var product = await _context.Products.FindAsync(id);
             if (product == null)
             {
-                return NotFound(new {Message = $"Product with id {id} not found"});
+                return NotFound(new ApiResponse<Object>(404, false, $"Product with id {id} not found"));
             }
             product.Name = updatedProduct.Name;
             product.Price = updatedProduct.Price;
@@ -64,7 +65,7 @@ namespace ProductManagementAPI.Controllers
 
             _context.Entry(product).State = EntityState.Modified;
             await _context.SaveChangesAsync();
-            return Ok(new {Message = "Product updated successfully", Product = product});
+            return Ok(new ApiResponse<Product>(200, true, "Product updated successfully", product));
         }
 
         [HttpDelete("{id}")]
@@ -73,11 +74,11 @@ namespace ProductManagementAPI.Controllers
             var product = await _context.Products.FindAsync(id);
             if (product == null)
             {
-                return NotFound(new {Message = $"Product with id {id} not found"});
+                return NotFound(new ApiResponse<Object>(404, false, $"Product with id {id} not found"));
             }
             _context.Products.Remove(product);
             await _context.SaveChangesAsync();
-            return Ok(new {Message = "Product deleted successfully"});
+            return Ok(new ApiResponse<Object>(200, true, "Product deleted successfully"));
         }
     } 
 }
