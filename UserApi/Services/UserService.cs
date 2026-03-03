@@ -1,41 +1,47 @@
+using UserApi.DTOs;
 using UserApi.Models;
-namespace UserApi.Service;
-
-public class UserService : IUserService
+using UserApi.Repository;
+namespace UserApi.Service
 {
-    private static readonly Dictionary<int, User> _users = new();
-    private static int _nextId = 1;
-
-    public IEnumerable<User> GetAllUsers()
+    public class UserService : IUserService
     {
-        return _users.Values;
-    }
-
-    public User? GetById(int id)
-    {
-        return _users.ContainsKey(id) ? _users[id] : null;
-    }
-
-    public void CreateUser(User user)
-    {
-        user.Id = _nextId++;
-        _users[user.Id] = user;
-    }
-
-    public bool UpdateUser(int id, User user)
-    {
-        if (!_users.ContainsKey(id))
+        private readonly IUserRepository _repository;
+        public UserService(IUserRepository repository)
         {
-            return false;
+            _repository = repository;
         }
-        user.Id = id;
-        _users[id] = user;
-        return true;
-    }
+        public async Task<IEnumerable<UserReadDto>> GetAllUsersAsync()
+        {
+            var users = await _repository.GetAllAsync();
+            return users.Select(u => new UserReadDto{Id = u.Id, Name = u.Name, Email = u.Email});
+        }
 
-    public bool DeleteUser(int id)
-    {
-        return _users.Remove(id);
+        public async Task<UserReadDto?> GetUserByIdAsync(int id)
+        {
+            var user = await _repository.GetByIdAsync(id);
+            if (user == null) return null;
+            return new UserReadDto { Id = user.Id, Name = user.Name, Email = user.Email };
+        }
+
+        public async Task<UserReadDto> CreateUserAsync(UserCreateDto dto)
+        {
+            var user = new User{Name = dto.Name, Email = dto.Email};
+            var createdUser = await _repository.CreateAsync(user);
+            return new UserReadDto { Id = createdUser.Id, Name = createdUser.Name, Email = createdUser.Email };
+        }
+
+        public async Task<UserReadDto> UpdateUserAsync(int id, UserCreateDto dto)
+        {
+            var user = new User { Name = dto.Name, Email = dto.Email };
+            var updatedUser = await _repository.UpdateAsync(id, user);
+            if (updatedUser == null) return null;
+            return new UserReadDto { Id = updatedUser.Id, Name = updatedUser.Name, Email = updatedUser.Email };
+        }
+    
+        public async Task<bool> DeleteUserAsync(int id)
+        {
+            return await _repository.DeleteAsync(id);
+        }
     }
 }
 

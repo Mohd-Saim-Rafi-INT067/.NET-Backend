@@ -1,63 +1,65 @@
 using Microsoft.AspNetCore.Mvc;
-using UserApi.Models;
+using UserApi.DTOs;
 using UserApi.Service;
+using UserApi.Responses;
 
-namespace UserApi.Controllers;
-
-[Route("api/users")]
-[ApiController]
-public class UserController: ControllerBase
-{
-    private readonly IUserService _UserService;
-    public UserController(IUserService service)
+namespace UserApi.Controllers{
+    [Route("api/users")]
+    [ApiController]
+    public class UserController: ControllerBase
     {
-        _UserService = service;
-    }
-    [HttpGet]
-    public IActionResult GetAllUsers()
-    {
-        var users = _UserService.GetAllUsers();
-        return Ok(users);
-    }
-
-    [HttpGet("{id}")]
-    public IActionResult GetById(int id)
-    {
-        var user = _UserService.GetById(id);
-        if (user == null)
+        private readonly IUserService _UserService;
+        public UserController(IUserService service)
         {
-            return NotFound();
+            _UserService = service;
         }
-        return Ok(user);
-    }
-
-    [HttpPost]
-    public IActionResult CreateUser(User user)
-    {
-        _UserService.CreateUser(user);
-        return CreatedAtAction(nameof(GetById), new {id = user.Id}, user);
-    }
-
-    [HttpPut("{id}")]
-    public IActionResult UpdateUser(int id, User user)
-    {
-        var success = _UserService.UpdateUser(id, user);
-        if (!success)
+        [HttpGet]
+        public async Task<IActionResult> GetAllUsers()
         {
-            return NotFound();
+            var users = await _UserService.GetAllUsersAsync();
+            return Ok(new ApiResponse(200, true, "Users retrieved successfully", data: users));
         }
-        return NoContent();
-    }
 
-    [HttpDelete("{id}")]
-    public IActionResult DeleteUser(int id)
-    {
-        var success = _UserService.DeleteUser(id);
-        if (!success)
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetUserById(int id)
         {
-            return NotFound();
+            var user = await _UserService.GetUserByIdAsync(id);
+            if (user == null)
+            {
+                return NotFound(new ApiResponse(404, false, $"User with id {id} not found."));
+            }
+            return Ok(new ApiResponse(200, true, "User retrieved successfully", data: user));
         }
-        return NoContent();
+
+        [HttpPost]
+        public async Task<IActionResult> CreateUser([FromBody] UserCreateDto dto)
+        {
+            var user = await _UserService.CreateUserAsync(dto);
+            return CreatedAtAction(nameof(GetUserById), new {id = user.Id}, new ApiResponse(201, true, "User created successfully", data: user));
+        }
+
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateUser(int id, [FromBody] UserCreateDto dto)
+        {
+            var updatedUser = await _UserService.UpdateUserAsync(id, dto);
+            if (updatedUser == null)
+            {
+                return NotFound(new ApiResponse(404, false, $"User with id {id} not found."));
+            }
+            return Ok(new ApiResponse(200, true, "User updated successfully", data: updatedUser));
+        }
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteUser(int id)
+        {
+            var result = await _UserService.DeleteUserAsync(id);
+            if (!result)
+            {
+                return NotFound(new ApiResponse(404, false, $"User with id {id} not found."));
+            }
+            return NoContent();
+        }
+
     }
 
 }

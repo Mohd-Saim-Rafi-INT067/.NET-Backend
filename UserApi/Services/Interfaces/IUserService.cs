@@ -1,11 +1,14 @@
-using UserApi.Models;
-namespace UserApi.Service;
+using UserApi.DTOs;
 
-public interface IUserService
+namespace UserApi.Service
 {
-    IEnumerable<User> GetAllUsers();
-    User? GetById(int id); //? -> may return user or may return null
-    void CreateUser(User user);
-    bool UpdateUser(int id, User user);
-    bool DeleteUser(int id);
+    public interface IUserService
+    {
+        Task<IEnumerable<UserReadDto>> GetAllUsersAsync();
+        Task<UserReadDto?> GetUserByIdAsync(int id);
+        Task<UserReadDto> CreateUserAsync(UserCreateDto user);
+        Task<UserReadDto?> UpdateUserAsync(int id, UserCreateDto user);
+        Task<bool> DeleteUserAsync(int id);
+    }
+    
 }
