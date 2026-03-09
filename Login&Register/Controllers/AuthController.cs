@@ -13,15 +13,15 @@ public class AuthController(AuthService authService) : ControllerBase
     [HttpPost("register")]
     public async Task<IActionResult> Register(RegisterDto dto)
     {
-        var (success,message) = await authService.RegisterAsync(dto);
-        return success ? Ok(new {message}) : Conflict(new {message});  
+        var result = await authService.RegisterAsync(dto);
+        return result.Success ? Ok(result) : Conflict(result);  
     }
 
     [HttpPost("login")]
     public async Task<IActionResult> Login(LoginDto dto)
     {
-        var (success, data, message ) = await authService.LoginAsync(dto);
-        return success ? Ok (data) : Unauthorized(new {message});
+        var result = await authService.LoginAsync(dto);
+        return result.Success ? Ok(result) : Unauthorized(result);
     }
 
     [Authorize]

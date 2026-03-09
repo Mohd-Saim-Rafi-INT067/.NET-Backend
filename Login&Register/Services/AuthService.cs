@@ -11,15 +11,15 @@ namespace Login_Register.Services;
 
 public class AuthService(AppDbContext _context, IConfiguration config)
 {
-    public async Task<(bool Success, string Message)> RegisterAsync(RegisterDto dto)
+    public async Task<ApiResponseDto<object>> RegisterAsync(RegisterDto dto)
     {
         if (await _context.Users.AnyAsync(u => u.Email == dto.Email))
         {
-            return (false, "Email already exists!");
+            return ApiResponseDto<object>.FailureResponse("Email already exists!");
         }
         if (await _context.Users.AnyAsync(u => u.Username == dto.Username))
         {
-            return (false, "Username already exists!");
+            return ApiResponseDto<object>.FailureResponse("Username already exists!");
         }
 
         var user = new User
@@ -30,19 +30,20 @@ public class AuthService(AppDbContext _context, IConfiguration config)
         };
         _context.Users.Add(user);
         await _context.SaveChangesAsync();
-        return (true, "User registered Successfully!");
+        return ApiResponseDto<object>.SuccessResponse( "User registered Successfully!");
     }
 
-    public async Task<(bool Success, AuthResponseDto? Data, string Message)> LoginAsync(LoginDto dto)
+    public async Task<ApiResponseDto<AuthResponseDto>> LoginAsync(LoginDto dto)
     {
         var user = await _context.Users.FirstOrDefaultAsync(u=> u.Email == dto.Email);
         if (user == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
         {
-            return (false, null, "Invalid email or password!");
+            return ApiResponseDto<AuthResponseDto>.FailureResponse("Invalid email or password!");
         }
 
         var token = GenerateToken(user);
-        return (true, new AuthResponseDto(token, user.Username, user.Email), "Login successful!");
+        var data = new AuthResponseDto(token, user.Username, user.Email);
+        return ApiResponseDto<AuthResponseDto>.SuccessResponse("Login successful!", data);
     }
 
     private string GenerateToken(User user)
