@@ -11,4 +11,7 @@ public class PasswordResetToken
 
     // Navigation property
     public User User { get; set; } = null!;
+
+
+   // No IsRevoked here (unlike RefreshToken) because reset tokens are single-use by design. When a new reset is requested, all previous active tokens are marked IsUsed = true.
 }

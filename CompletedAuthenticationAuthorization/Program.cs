@@ -1,49 +1,61 @@
-using System.Text;
+using AuthenticationAuthorization;
+using AuthenticationAuthorization.Data;
+using AuthenticationAuthorization.Interfaces;
+using AuthenticationAuthorization.Middleware;
+using AuthenticationAuthorization.Repositories;
+using AuthenticationAuthorization.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using AuthenticationAuthorization.Data;
-using AuthenticationAuthorization.Services;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddDbContext<AppDbContext>(opt =>
-    opt.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+// Strongly-typed JWT config — single source of truth
+builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 
-builder.Services.AddScoped<TokenService>();
-builder.Services.AddScoped<AuthService>();
-builder.Services.AddScoped<EmailService>();           
-builder.Services.AddScoped<PasswordResetService>();  
+// Database
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlite(builder.Configuration.GetConnectionString("Default")));
 
+// Repositories
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+builder.Services.AddScoped<IPasswordResetTokenRepository, PasswordResetTokenRepository>();
+
+// Services
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<IPasswordResetService, PasswordResetService>();
+builder.Services.AddScoped<EmailService>(); 
+
+// JWT Authentication
+var jwtSection = builder.Configuration.GetSection("Jwt");
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(opt =>
+    .AddJwtBearer(options =>
     {
-        opt.TokenValidationParameters = new TokenValidationParameters
+        options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidAudience = builder.Configuration["Jwt:Audience"],
+            ValidIssuer = jwtSection["Issuer"],
+            ValidAudience = jwtSection["Audience"],
             IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:SecretKey"]!)),
-            ClockSkew = TimeSpan.Zero 
+                Encoding.UTF8.GetBytes(jwtSection["SecretKey"]!))
         };
     });
 
 builder.Services.AddAuthorization();
 builder.Services.AddControllers();
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
-using (var scope = app.Services.CreateScope())
-    scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.Migrate();
 
-app.UseSwagger();
-app.UseSwaggerUI();
+
+app.UseMiddleware<GlobalExceptionMiddleware>(); 
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+
 app.Run();

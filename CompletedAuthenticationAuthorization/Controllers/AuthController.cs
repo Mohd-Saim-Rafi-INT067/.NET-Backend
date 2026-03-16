@@ -1,14 +1,15 @@
+// Controllers/AuthController.cs
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using AuthenticationAuthorization.DTOs;
-using AuthenticationAuthorization.Services;
+using AuthenticationAuthorization.Interfaces;
 
 namespace AuthenticationAuthorization.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class AuthController(AuthService authService, PasswordResetService passwordResetService) : ControllerBase
+public class AuthController(IAuthService authService, IPasswordResetService passwordResetService) : ControllerBase
 {
     [HttpPost("register")]
     public async Task<IActionResult> Register(RegisterDto dto)
@@ -44,22 +45,26 @@ public class AuthController(AuthService authService, PasswordResetService passwo
     [HttpPost("logout-all")]
     public async Task<IActionResult> LogoutAll()
     {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
+            return Unauthorized();
+
         var result = await authService.LogoutAllAsync(userId, Response);
         return Ok(result);
     }
 
     [Authorize]
     [HttpGet("me")]
-    public IActionResult Me()
+    public IActionResult Me() 
     {
-        return Ok(new
+        var data = new 
         {
             Id = User.FindFirstValue(ClaimTypes.NameIdentifier),
             Username = User.FindFirstValue(ClaimTypes.Name),
             Email = User.FindFirstValue(ClaimTypes.Email),
             Role = User.FindFirstValue(ClaimTypes.Role)
-        });
+        };
+        return Ok(ApiResponseDto<object>.Ok("User info retrieved successfully!", data));
+
     }
 
     [HttpPost("forgot-password")]
@@ -69,10 +74,10 @@ public class AuthController(AuthService authService, PasswordResetService passwo
         return Ok(result);
     }
 
-    [HttpGet("validate-reset-token")]
-    public async Task<IActionResult> ValidateResetToken(string token)
+    [HttpPost("validate-reset-token")]
+    public async Task<IActionResult> ValidateResetToken(ValidateResetTokenDto dto)
     {
-        var result = await passwordResetService.ValidateResetTokenAsync(token);
+        var result = await passwordResetService.ValidateResetTokenAsync(dto.Token);
         return result.Success ? Ok(result) : BadRequest(result);
     }
 

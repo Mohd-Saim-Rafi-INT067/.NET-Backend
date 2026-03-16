@@ -6,7 +6,7 @@ namespace AuthenticationAuthorization.Models
         public string Username { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
         public string PasswordHash { get; set; } = string.Empty;
-        public string Role { get; set; } = "User"; 
+        public string Role { get; set; } = "User"; //User or Admin
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public bool IsActive { get; set; } = true; //for banning Users,if false, user cannot login
 

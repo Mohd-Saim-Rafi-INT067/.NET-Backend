@@ -1,22 +1,20 @@
-using Microsoft.EntityFrameworkCore;
-using AuthenticationAuthorization.Data;
+// Services/AuthService.cs
 using AuthenticationAuthorization.DTOs;
+using AuthenticationAuthorization.Interfaces;
 using AuthenticationAuthorization.Models;
 
 namespace AuthenticationAuthorization.Services;
 
-public class AuthService(AppDbContext db, TokenService tokenService)
+public class AuthService(IUserRepository userRepo, ITokenService tokenService) : IAuthService
 {
     public async Task<ApiResponseDto> RegisterAsync(RegisterDto dto)
     {
-        if (await db.Users.AnyAsync(u=>u.Email == dto.Email))
-        {
+        if (await userRepo.EmailExistsAsync(dto.Email))
             return ApiResponseDto.Fail("Email already exists!");
-        }
-        if (await db.Users.AnyAsync(u=>u.Username == dto.Username))
-        {
+
+        if (await userRepo.UsernameExistsAsync(dto.Username))
             return ApiResponseDto.Fail("Username already exists!");
-        }
+
         var newUser = new User
         {
             Username = dto.Username,
@@ -24,30 +22,27 @@ public class AuthService(AppDbContext db, TokenService tokenService)
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
             Role = "User"
         };
-        db.Users.Add(newUser);
-        await db.SaveChangesAsync();
+
+        await userRepo.AddAsync(newUser);
+        await userRepo.SaveChangesAsync();
         return ApiResponseDto.Ok("User registered successfully!");
     }
 
     public async Task<ApiResponseDto<AuthResponseDto>> LoginAsync(LoginDto dto, HttpResponse response, string? deviceInfo)
     {
-        var user = await db.Users.FirstOrDefaultAsync(u=>u.Email == dto.Email);
-        
+        var user = await userRepo.GetByEmailAsync(dto.Email);
+
         if (user == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
-        {
             return ApiResponseDto<AuthResponseDto>.Fail("Invalid email or password!");
-        }
 
         if (!user.IsActive)
-        {
-            return ApiResponseDto<AuthResponseDto>.Fail("Your account is banned!");
-        }
+            return ApiResponseDto<AuthResponseDto>.Fail("Your account has been banned!");
 
         var accessToken = tokenService.GenerateAccessToken(user);
         var refreshToken = tokenService.GenerateRefreshToken();
-        await tokenService.SaveRefreshTokenAsync(user.Id, refreshToken, deviceInfo);
 
-        tokenService.SetRefreshTokenCookies(response, refreshToken);
+        await tokenService.SaveRefreshTokenAsync(user.Id, refreshToken, deviceInfo);
+        tokenService.SetRefreshTokenCookie(response, refreshToken);
 
         var data = new AuthResponseDto(accessToken, user.Username, user.Email, user.Role);
         return ApiResponseDto<AuthResponseDto>.Ok("Login successful!", data);
@@ -57,68 +52,56 @@ public class AuthService(AppDbContext db, TokenService tokenService)
     {
         var incomingToken = request.Cookies["refreshToken"];
         if (string.IsNullOrEmpty(incomingToken))
-        {
             return ApiResponseDto<AuthResponseDto>.Fail("No refresh token found!");
-        }
 
-        if (await tokenService.isReuseAttackAsync(incomingToken))
+        if (await tokenService.IsReuseAttackAsync(incomingToken))
         {
-            //hacker
-            var compromisedToken = await db.RefreshTokens.SingleOrDefaultAsync(t=>t.Token == incomingToken);
-            if (compromisedToken != null)
-            {
-                await tokenService.RevokeAllTokenAsync(compromisedToken.UserId);
-            }
-            tokenService.ClearRefreshTokenCookies(response);
+            // Token was already used — potential theft. Nuke all sessions.
+            var compromised = await tokenService.ValidateRefreshTokenAsync(incomingToken);
+            if (compromised != null)
+                await tokenService.RevokeAllTokensAsync(compromised.UserId);
+
+            tokenService.ClearRefreshTokenCookie(response);
             return ApiResponseDto<AuthResponseDto>.Fail("Security alert! Please login again.");
         }
 
-        //validate the token
         var refreshToken = await tokenService.ValidateRefreshTokenAsync(incomingToken);
         if (refreshToken == null)
         {
-            tokenService.ClearRefreshTokenCookies(response);
-            return ApiResponseDto<AuthResponseDto>.Fail("Invalid refresh token! Please login again.");
+            tokenService.ClearRefreshTokenCookie(response);
+            return ApiResponseDto<AuthResponseDto>.Fail("Invalid or expired refresh token!");
         }
 
         if (!refreshToken.User.IsActive)
-        {
-            return ApiResponseDto<AuthResponseDto>.Fail("Your account is banned!");
-        }
+            return ApiResponseDto<AuthResponseDto>.Fail("Your account has been banned!");
 
-        //rotate the token
         var newRefreshToken = await tokenService.RotateRefreshTokenAsync(refreshToken);
         var newAccessToken = tokenService.GenerateAccessToken(refreshToken.User);
-        tokenService.SetRefreshTokenCookies(response, newRefreshToken);
+        tokenService.SetRefreshTokenCookie(response, newRefreshToken);
 
         var data = new AuthResponseDto(
-            newAccessToken, 
-            refreshToken.User.Username, 
-            refreshToken.User.Email, 
-            refreshToken.User.Role
-        );
+            newAccessToken,
+            refreshToken.User.Username,
+            refreshToken.User.Email,
+            refreshToken.User.Role);
 
         return ApiResponseDto<AuthResponseDto>.Ok("Token refreshed successfully!", data);
     }
 
-    //Logout single device
     public async Task<ApiResponseDto> LogoutAsync(HttpRequest request, HttpResponse response)
     {
         var token = request.Cookies["refreshToken"];
         if (!string.IsNullOrEmpty(token))
-        {
             await tokenService.RevokeTokenAsync(token);
-        }
-        tokenService.ClearRefreshTokenCookies(response);
+
+        tokenService.ClearRefreshTokenCookie(response);
         return ApiResponseDto.Ok("Logged out successfully!");
     }
 
     public async Task<ApiResponseDto> LogoutAllAsync(int userId, HttpResponse response)
     {
-        await tokenService.RevokeAllTokenAsync(userId);
-        tokenService.ClearRefreshTokenCookies(response);
+        await tokenService.RevokeAllTokensAsync(userId);
+        tokenService.ClearRefreshTokenCookie(response);
         return ApiResponseDto.Ok("Logged out from all devices successfully!");
     }
-
-
 }

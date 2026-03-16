@@ -15,7 +15,7 @@ public class ApiResponseDto
 public class ApiResponseDto<T> : ApiResponseDto
 {
     public T? Data { get; set; }
-    public static ApiResponseDto<T> Ok(string message, T? data = default)
+    public new static ApiResponseDto<T> Ok(string message, T? data = default)
     => new () {Success = true, Message = message, Data = data};
 
     public new static ApiResponseDto<T> Fail(string message)
